@@ -24,11 +24,25 @@
             display: flex;
             gap: 12px;
             align-items: center;
+            justify-content: space-between;
             flex-wrap: wrap;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             border-bottom: 1px solid #ddd;
             position: relative;
             z-index: 100;
+        }
+
+        .toolbar-left {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-right {
+            display: flex;
+            gap: 8px;
+            align-items: center;
         }
 
         .tool-group {
@@ -64,6 +78,11 @@
             border-color: #007acc;
         }
 
+        .icon-btn {
+            padding: 6px 10px;
+            font-size: 18px;
+        }
+
         input[type="color"] {
             width: 36px;
             height: 32px;
@@ -92,18 +111,18 @@
             flex: 1;
             background: #f0f0f0;
             cursor: crosshair;
-            overflow-y: auto;
-            overflow-x: hidden;
+            overflow: auto;
             position: relative;
+            min-width: 0;
         }
 
         canvas {
-            width: 100%;
-            height: auto;
             display: block;
             cursor: crosshair;
             touch-action: none;
-            will-change: transform;
+            transform-origin: 0 0;
+            transition: transform 0.1s ease;
+            min-width: 100%;
         }
 
         .quick-pens {
@@ -141,6 +160,64 @@
             display: flex;
         }
 
+        /* Floating Menus */
+        .floating-menu {
+            position: fixed;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 12px;
+            z-index: 200;
+            display: none;
+            min-width: 200px;
+            border: 1px solid #ddd;
+        }
+
+        .floating-menu.active {
+            display: block;
+        }
+
+        .floating-menu .menu-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .floating-menu .menu-item:hover {
+            background: #f0f0f0;
+        }
+
+        .floating-menu .menu-divider {
+            height: 1px;
+            background: #eee;
+            margin: 8px 0;
+        }
+
+        .floating-menu .color-preview {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .zoom-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+            z-index: 100;
+            pointer-events: none;
+        }
+
         .notes-sidebar {
             width: 300px;
             background: white;
@@ -151,34 +228,34 @@
             gap: 15px;
             overflow-y: auto;
             transition: transform 0.3s ease;
-            position: relative;
+            position: fixed;
+            right: 0;
+            top: 62px;
+            bottom: 0;
             z-index: 10;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            transform: translateX(0);
         }
 
         .notes-sidebar.hidden {
             transform: translateX(100%);
-            position: absolute;
-            right: 0;
-            top: 0;
-            height: 100%;
-            background: white;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .main-container {
+            display: flex;
+            height: calc(100vh - 62px);
+            position: relative;
+            width: 100%;
         }
 
         .toggle-sidebar-btn {
-            position: fixed;
-            right: 10px;
-            bottom: 20px;
             background: #007acc;
             color: white;
             border: none;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            font-size: 22px;
+            border-radius: 6px;
+            padding: 6px 12px;
             cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 20;
+            font-size: 18px;
             transition: all 0.2s;
         }
 
@@ -282,91 +359,97 @@
             color: #007acc;
             font-weight: 600;
         }
-
-        .performance-badge {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.6);
-            color: #0f0;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-family: monospace;
-            z-index: 100;
-            pointer-events: none;
-        }
     </style>
 </head>
 <body>
     <div class="toolbar">
-        <div class="tool-group">
-            <button id="penBtn" class="active">✏️ Pen</button>
-            <button id="eraserBtn">🧽 Eraser</button>
-            <button id="lassoBtn">Lasso</button>
-            <button id="clearBtn">🗑️ Clear</button>
-            <button id="undoBtn">↩️ Undo</button>
-            <button id="redoBtn">↪️ Redo</button>
+        <div class="toolbar-left">
+            <div class="tool-group">
+                <button id="penBtn" class="active">✏️ Pen</button>
+                <button id="eraserBtn">🧽 Eraser</button>
+                <button id="lassoBtn">Lasso</button>
+                <button id="clearBtn">🗑️ Clear</button>
+                <button id="undoBtn">↩️ Undo</button>
+                <button id="redoBtn">↪️ Redo</button>
+            </div>
+            
+            <div class="tool-group">
+                <label>Quick pens:</label>
+                <div class="quick-pens" id="quickPens"></div>
+                <button id="saveFavoritePenBtn">Save</button>
+            </div>
+
+            <div class="tool-group selection-actions" id="selectionActions">
+                <button id="copySelectionBtn">Copy</button>
+                <button id="cutSelectionBtn">Cut</button>
+                <button id="pasteSelectionBtn">Paste</button>
+                <button id="deleteSelectionBtn">Delete selection</button>
+                <button id="clearSelectionBtn">Clear selection</button>
+            </div>
         </div>
         
-        <div class="tool-group">
-            <label>🎨 Color:</label>
-            <input type="color" id="colorPicker" value="#000000">
-        </div>
-        
-        <div class="tool-group">
-            <label>✏️ Size:</label>
-            <input type="range" id="brushSize" min="1" max="20" value="3">
-            <span id="sizeValue">3px</span>
-        </div>
-
-        <div class="tool-group">
-            <label>Eraser:</label>
-            <button id="pixelEraserBtn" class="active">Area</button>
-            <button id="strokeEraserBtn">Stroke</button>
-            <input type="range" id="eraserSize" min="4" max="60" value="18">
-            <span id="eraserSizeValue">18px</span>
-        </div>
-
-        <div class="tool-group">
-            <label>Quick pens:</label>
-            <div class="quick-pens" id="quickPens"></div>
-            <button id="saveFavoritePenBtn">Save</button>
-        </div>
-
-        <div class="tool-group">
-            <label>🌓 Mode:</label>
-            <button id="lightModeBtn" class="active">☀️ Light</button>
-            <button id="darkModeBtn">🌙 Dark</button>
-        </div>
-
-        <div class="tool-group">
-            <label>📐 Background:</label>
-            <button id="cleanBtn" class="active">Clean</button>
-            <button id="gridBtn">Grid</button>
-            <button id="linesBtn">Lines</button>
-        </div>
-
-        <div class="tool-group selection-actions" id="selectionActions">
-            <button id="copySelectionBtn">Copy</button>
-            <button id="cutSelectionBtn">Cut</button>
-            <button id="pasteSelectionBtn">Paste</button>
-            <button id="deleteSelectionBtn">Delete selection</button>
-            <button id="clearSelectionBtn">Clear selection</button>
-        </div>
-        
-        <div class="tool-group">
-            <button id="exportBtn">📸 Export Image</button>
+        <div class="toolbar-right">
+            <button id="settingsBtn" class="icon-btn">⚙️ Settings</button>
+            <button id="toggleSidebarBtn" class="icon-btn">📋 Notes</button>
+            <button id="resetZoomBtn" class="icon-btn" title="Reset Zoom (Ctrl+0)">🔍 Reset</button>
         </div>
     </div>
 
-    <button class="toggle-sidebar-btn" id="toggleSidebarBtn">📋</button>
+    <!-- Settings Floating Menu -->
+    <div id="settingsMenu" class="floating-menu">
+        <div class="menu-item" id="modeItem">
+            <span>🌓 Mode:</span>
+            <span id="modeStatus">Light</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" id="backgroundItem">
+            <span>📐 Background:</span>
+            <span id="backgroundStatus">Clean</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" id="exportItem">
+            <span>📸 Export Image</span>
+        </div>
+    </div>
+
+    <!-- Pen Settings Floating Menu -->
+    <div id="penMenu" class="floating-menu">
+        <div class="menu-item">
+            <span>🎨 Color:</span>
+            <input type="color" id="colorPicker" value="#000000">
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item">
+            <span>✏️ Size:</span>
+            <input type="range" id="brushSize" min="1" max="20" value="3">
+            <span id="sizeValue">3px</span>
+        </div>
+    </div>
+
+    <!-- Eraser Settings Floating Menu -->
+    <div id="eraserMenu" class="floating-menu">
+        <div class="menu-item">
+            <span>🧽 Eraser Mode:</span>
+        </div>
+        <div class="menu-item" id="pixelEraserItem">
+            <span>○ Area Eraser</span>
+        </div>
+        <div class="menu-item" id="strokeEraserItem">
+            <span>● Stroke Eraser</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item">
+            <span>📏 Eraser Size:</span>
+            <input type="range" id="eraserSize" min="4" max="60" value="18">
+            <span id="eraserSizeValue">18px</span>
+        </div>
+    </div>
 
     <div class="main-container">
-        <div class="canvas-container">
+        <div class="canvas-container" id="canvasContainer">
             <canvas id="whiteboard"></canvas>
         </div>
-        <div class="notes-sidebar">
+        <div class="notes-sidebar" id="notesSidebar">
             <div class="notes-header">📝 Saved Notes</div>
             <div class="note-input-area">
                 <input type="text" id="noteTitle" placeholder="Note title...">
@@ -378,7 +461,8 @@
             <div class="notes-list" id="notesList"></div>
         </div>
     </div>
-    <div class="performance-badge" id="perfBadge">⚡ Optimized Mode</div>
+    
+    <div class="zoom-indicator" id="zoomIndicator">100%</div>
 
     <script>
         class OptimizedWhiteboard {
@@ -387,7 +471,7 @@
                 this.ctx = this.canvas.getContext('2d');
                 this.offscreenCanvas = document.createElement('canvas');
                 this.offscreenCtx = this.offscreenCanvas.getContext('2d');
-                this.container = this.canvas.parentElement;
+                this.container = document.getElementById('canvasContainer');
                 this.items = [];
                 this.history = [];
                 this.historyIndex = -1;
@@ -401,6 +485,7 @@
                 this.eraserMode = 'area';
                 this.mode = 'light';
                 this.backgroundStyle = 'clean';
+                this.canvasWidth = 0;
                 this.canvasHeight = 0;
                 this.currentStroke = null;
                 this.currentLasso = null;
@@ -414,6 +499,8 @@
                 this.cachedOffscreenValid = false;
                 this.spatialIndex = new Map();
                 this.gridSize = 100;
+                this.zoom = 1;
+                this.currentNoteId = null;
                 this.init();
             }
 
@@ -427,20 +514,79 @@
                 this.scheduleRender();
                 this.startAutosave();
                 this.updateViewport();
+                this.setupZoom();
+            }
+
+            setupZoom() {
+                this.container.addEventListener('wheel', (e) => {
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        
+                        // Get cursor position relative to canvas
+                        const rect = this.canvas.getBoundingClientRect();
+                        const cursorX = (e.clientX - rect.left) / (rect.width / this.canvasWidth);
+                        const cursorY = (e.clientY - rect.top) / (rect.height / this.canvasHeight);
+                        
+                        // Calculate old zoom
+                        const oldZoom = this.zoom;
+                        
+                        // Update zoom
+                        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                        this.zoom = Math.max(0.25, Math.min(3, this.zoom + delta));
+                        this.applyZoom();
+                        
+                        // Adjust scroll to keep cursor position fixed
+                        const scaleFactor = this.zoom / oldZoom;
+                        const newCursorX = cursorX * scaleFactor;
+                        const newCursorY = cursorY * scaleFactor;
+                        
+                        this.container.scrollLeft += (newCursorX - cursorX) * (rect.width / this.canvasWidth);
+                        this.container.scrollTop += (newCursorY - cursorY) * (rect.height / this.canvasHeight);
+                        
+                        // Invalidate cache to force redraw
+                        this.cachedOffscreenValid = false;
+                        this.scheduleRender();
+                    } else if (e.shiftKey) {
+                        e.preventDefault();
+                        // Horizontal scroll - adjust scroll amount based on zoom
+                        const scrollAmount = e.deltaY * (1 / this.zoom);
+                        this.container.scrollLeft += scrollAmount;
+                    } else {
+                        // Normal vertical scroll - already handled by browser
+                        // But we need to ensure viewport updates for rendering
+                        this.updateViewport();
+                        this.cachedOffscreenValid = false;
+                        this.scheduleRender();
+                    }
+                });
+            }
+
+            applyZoom() {
+                const percent = Math.round(this.zoom * 100);
+                document.getElementById('zoomIndicator').textContent = percent + '%';
+                this.canvas.style.transform = `scale(${this.zoom})`;
+                this.canvas.style.transformOrigin = '0 0';
+            }
+
+            resetZoom() {
+                this.zoom = 1;
+                this.applyZoom();
             }
 
             updateViewport() {
                 const rect = this.container.getBoundingClientRect();
                 const scrollTop = this.container.scrollTop;
-                this.viewportTop = scrollTop;
-                this.viewportBottom = scrollTop + rect.height;
+                // Account for zoom when calculating visible area
+                this.viewportTop = scrollTop / this.zoom;
+                this.viewportBottom = (scrollTop + rect.height) / this.zoom;
             }
 
             isStrokeVisible(stroke) {
                 if (!stroke.points || stroke.points.length === 0) return false;
-                const margin = 200;
+                const margin = 500;
                 const minY = Math.min(...stroke.points.map(p => p.y));
                 const maxY = Math.max(...stroke.points.map(p => p.y));
+                // Use zoom-corrected viewport values
                 return maxY >= this.viewportTop - margin && minY <= this.viewportBottom + margin;
             }
 
@@ -488,15 +634,20 @@
             }
 
             resizeCanvas() {
-                const width = Math.max(320, this.container.clientWidth);
+                // Use a fixed large width (e.g., 2000px) instead of container width
+                // This allows horizontal scrolling to access full note width
+                const width = Math.max(2000, this.canvasWidth);
                 const height = Math.max(this.container.clientHeight * 2, this.canvasHeight, 1600);
+                this.canvasWidth = width;
+                this.canvasHeight = height;
                 this.canvas.width = width;
                 this.canvas.height = height;
                 this.offscreenCanvas.width = width;
                 this.offscreenCanvas.height = height;
+                this.canvas.style.width = width + 'px';
                 this.canvas.style.height = height + 'px';
-                this.canvasHeight = height;
                 this.cachedOffscreenValid = false;
+                this.bgPatternDirty = true;
                 this.scheduleRender();
             }
 
@@ -511,6 +662,7 @@
                 this.offscreenCanvas.height = this.canvasHeight;
                 this.canvas.style.height = this.canvasHeight + 'px';
                 this.cachedOffscreenValid = false;
+                this.bgPatternDirty = true;
                 this.scheduleRender();
             }
 
@@ -532,10 +684,16 @@
                 this.ctx.save();
                 this.ctx.globalCompositeOperation = 'source-over';
                 this.ctx.fillStyle = this.getBgColor();
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
 
-                if (this.backgroundStyle === 'grid') this.drawGrid();
-                if (this.backgroundStyle === 'lines') this.drawLines();
+                // Draw background pattern (grid/lines) - but cache it for performance
+                if (!this.bgPatternCache || this.bgPatternDirty) {
+                    this.drawBackgroundPattern();
+                    this.bgPatternDirty = false;
+                }
+                if (this.bgPatternCache) {
+                    this.ctx.drawImage(this.bgPatternCache, 0, 0);
+                }
 
                 if (this.cachedOffscreenValid) {
                     this.ctx.drawImage(this.offscreenCanvas, 0, 0);
@@ -560,22 +718,82 @@
                 this.drawLassoPreview();
                 this.ctx.restore();
             }
+            
+            drawBackgroundPattern() {
+                // Create or reuse background cache canvas
+                if (!this.bgPatternCache) {
+                    this.bgPatternCache = document.createElement('canvas');
+                }
+                this.bgPatternCache.width = this.canvasWidth;
+                this.bgPatternCache.height = this.canvasHeight;
+                const bgCtx = this.bgPatternCache.getContext('2d');
+                
+                bgCtx.fillStyle = this.getBgColor();
+                bgCtx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+                
+                if (this.backgroundStyle === 'grid') {
+                    this.drawGridOnContext(bgCtx);
+                } else if (this.backgroundStyle === 'lines') {
+                    this.drawLinesOnContext(bgCtx);
+                }
+            }
+            
+            drawGridOnContext(ctx) {
+                const size = 30;
+                ctx.save();
+                ctx.strokeStyle = this.getGridColor();
+                ctx.lineWidth = 1;
+                
+                for (let x = 0; x <= this.canvasWidth; x += size) {
+                    ctx.beginPath();
+                    ctx.moveTo(x + 0.5, 0);
+                    ctx.lineTo(x + 0.5, this.canvasHeight);
+                    ctx.stroke();
+                }
+                
+                for (let y = 0; y <= this.canvasHeight; y += size) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y + 0.5);
+                    ctx.lineTo(this.canvasWidth, y + 0.5);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+            
+            drawLinesOnContext(ctx) {
+                const spacing = 32;
+                ctx.save();
+                ctx.strokeStyle = this.getLinesColor();
+                ctx.lineWidth = 1;
+                
+                for (let y = 0; y <= this.canvasHeight; y += spacing) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y + 0.5);
+                    ctx.lineTo(this.canvasWidth, y + 0.5);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
 
             drawGrid() {
                 const size = 30;
                 this.ctx.save();
                 this.ctx.strokeStyle = this.getGridColor();
                 this.ctx.lineWidth = 1;
-                for (let x = size; x < this.canvas.width; x += size) {
+                
+                // Draw vertical lines - full height
+                for (let x = 0; x <= this.canvasWidth; x += size) {
                     this.ctx.beginPath();
-                    this.ctx.moveTo(x + 0.5, this.viewportTop);
-                    this.ctx.lineTo(x + 0.5, this.viewportBottom);
+                    this.ctx.moveTo(x + 0.5, 0);
+                    this.ctx.lineTo(x + 0.5, this.canvasHeight);
                     this.ctx.stroke();
                 }
-                for (let y = Math.ceil(this.viewportTop / size) * size; y < this.viewportBottom; y += size) {
+                
+                // Draw horizontal lines - full width
+                for (let y = 0; y <= this.canvasHeight; y += size) {
                     this.ctx.beginPath();
                     this.ctx.moveTo(0, y + 0.5);
-                    this.ctx.lineTo(this.canvas.width, y + 0.5);
+                    this.ctx.lineTo(this.canvasWidth, y + 0.5);
                     this.ctx.stroke();
                 }
                 this.ctx.restore();
@@ -586,10 +804,12 @@
                 this.ctx.save();
                 this.ctx.strokeStyle = this.getLinesColor();
                 this.ctx.lineWidth = 1;
-                for (let y = Math.ceil(this.viewportTop / spacing) * spacing; y < this.viewportBottom; y += spacing) {
+                
+                // Draw horizontal lines - full width
+                for (let y = 0; y <= this.canvasHeight; y += spacing) {
                     this.ctx.beginPath();
                     this.ctx.moveTo(0, y + 0.5);
-                    this.ctx.lineTo(this.canvas.width, y + 0.5);
+                    this.ctx.lineTo(this.canvasWidth, y + 0.5);
                     this.ctx.stroke();
                 }
                 this.ctx.restore();
@@ -598,7 +818,7 @@
             drawItem(item, targetCtx = this.ctx) {
                 if (item.type === 'image') {
                     const img = item.imageElement;
-                    if (img) targetCtx.drawImage(img, 0, 0, this.canvas.width, item.height || this.canvas.height);
+                    if (img) targetCtx.drawImage(img, 0, 0, this.canvasWidth, item.height || this.canvasHeight);
                     return;
                 }
 
@@ -744,8 +964,52 @@
                 document.getElementById('deleteSelectionBtn').onclick = () => this.deleteSelection();
                 document.getElementById('clearSelectionBtn').onclick = () => this.clearSelection();
                 document.getElementById('saveFavoritePenBtn').onclick = () => this.saveFavoritePen();
-                document.getElementById('exportBtn').onclick = () => this.export();
                 document.getElementById('chooseNotesFolderBtn').onclick = () => this.chooseNotesFolder();
+                document.getElementById('saveNoteBtn').onclick = () => this.saveNote();
+                document.getElementById('resetZoomBtn').onclick = () => this.resetZoom();
+
+                // Floating menus
+                const settingsBtn = document.getElementById('settingsBtn');
+                const settingsMenu = document.getElementById('settingsMenu');
+                const penBtn = document.getElementById('penBtn');
+                const penMenu = document.getElementById('penMenu');
+                const eraserBtn = document.getElementById('eraserBtn');
+                const eraserMenu = document.getElementById('eraserMenu');
+                const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+                const notesSidebar = document.getElementById('notesSidebar');
+
+                settingsBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.toggleMenu(settingsMenu, settingsBtn);
+                };
+
+                penBtn.ondblclick = (e) => {
+                    e.stopPropagation();
+                    this.toggleMenu(penMenu, penBtn);
+                };
+
+                eraserBtn.ondblclick = (e) => {
+                    e.stopPropagation();
+                    this.toggleMenu(eraserMenu, eraserBtn);
+                };
+
+                toggleSidebarBtn.onclick = () => {
+                    notesSidebar.classList.toggle('hidden');
+                };
+
+                // Close menus when clicking elsewhere
+                document.addEventListener('click', () => {
+                    settingsMenu.classList.remove('active');
+                    penMenu.classList.remove('active');
+                    eraserMenu.classList.remove('active');
+                });
+
+                // Menu items
+                document.getElementById('modeItem').onclick = () => this.cycleMode();
+                document.getElementById('backgroundItem').onclick = () => this.cycleBackground();
+                document.getElementById('exportItem').onclick = () => this.export();
+                document.getElementById('pixelEraserItem').onclick = () => this.setEraserMode('area');
+                document.getElementById('strokeEraserItem').onclick = () => this.setEraserMode('stroke');
 
                 document.getElementById('colorPicker').onchange = (e) => this.currentColor = e.target.value;
                 document.getElementById('brushSize').oninput = (e) => {
@@ -756,14 +1020,6 @@
                     this.eraserSize = parseInt(e.target.value, 10);
                     document.getElementById('eraserSizeValue').innerText = this.eraserSize + 'px';
                 };
-
-                document.getElementById('pixelEraserBtn').onclick = () => this.setEraserMode('area');
-                document.getElementById('strokeEraserBtn').onclick = () => this.setEraserMode('stroke');
-                document.getElementById('lightModeBtn').onclick = () => this.setMode('light');
-                document.getElementById('darkModeBtn').onclick = () => this.setMode('dark');
-                document.getElementById('cleanBtn').onclick = () => this.setBackground('clean');
-                document.getElementById('gridBtn').onclick = () => this.setBackground('grid');
-                document.getElementById('linesBtn').onclick = () => this.setBackground('lines');
                 
                 let scrollTimeout;
                 this.container.addEventListener('scroll', () => {
@@ -785,12 +1041,71 @@
                 this.updateActiveStates();
             }
 
+            toggleMenu(menu, button) {
+                const rect = button.getBoundingClientRect();
+                const menuWidth = menu.offsetWidth;
+                const menuHeight = menu.offsetHeight;
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                let top = rect.bottom + 5;
+                let left = rect.left;
+                
+                // Check if menu goes off-screen to the right
+                if (left + menuWidth > viewportWidth) {
+                    left = viewportWidth - menuWidth - 10;
+                }
+                // Check if menu goes off-screen to the left
+                if (left < 10) {
+                    left = 10;
+                }
+                // Check if menu goes off-screen at the bottom
+                if (top + menuHeight > viewportHeight) {
+                    top = rect.top - menuHeight - 5;
+                }
+                // Check if menu goes off-screen at the top
+                if (top < 10) {
+                    top = 10;
+                }
+                
+                menu.style.top = top + 'px';
+                menu.style.left = left + 'px';
+                menu.style.right = 'auto';
+                menu.classList.toggle('active');
+            }
+
+            cycleMode() {
+                this.mode = this.mode === 'light' ? 'dark' : 'light';
+                document.getElementById('modeStatus').textContent = this.mode === 'light' ? 'Light' : 'Dark';
+                this.dirty = true;
+                this.cachedOffscreenValid = false;
+                this.bgPatternDirty = true;
+                this.updateActiveStates();
+                this.scheduleRender();
+            }
+
+            cycleBackground() {
+                const styles = ['clean', 'grid', 'lines'];
+                const currentIndex = styles.indexOf(this.backgroundStyle);
+                this.backgroundStyle = styles[(currentIndex + 1) % styles.length];
+                const names = { clean: 'Clean', grid: 'Grid', lines: 'Lines' };
+                document.getElementById('backgroundStatus').textContent = names[this.backgroundStyle];
+                this.dirty = true;
+                this.cachedOffscreenValid = false;
+                this.bgPatternDirty = true;
+                this.updateActiveStates();
+                this.scheduleRender();
+            }
+
             handleKeyboard(e) {
                 const activeTag = document.activeElement ? document.activeElement.tagName : '';
                 if (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag)) return;
                 const hasModifier = e.ctrlKey || e.metaKey;
 
-                if (hasModifier && e.shiftKey && e.key.toLowerCase() === 'z') {
+                if (hasModifier && e.key === '0') {
+                    e.preventDefault();
+                    this.resetZoom();
+                } else if (hasModifier && e.shiftKey && e.key.toLowerCase() === 'z') {
                     e.preventDefault();
                     this.redo();
                 } else if (hasModifier && e.key.toLowerCase() === 'z') {
@@ -822,22 +1137,6 @@
                 this.updateActiveStates();
             }
 
-            setMode(mode) {
-                this.mode = mode;
-                this.dirty = true;
-                this.cachedOffscreenValid = false;
-                this.updateActiveStates();
-                this.scheduleRender();
-            }
-
-            setBackground(style) {
-                this.backgroundStyle = style;
-                this.dirty = true;
-                this.cachedOffscreenValid = false;
-                this.updateActiveStates();
-                this.scheduleRender();
-            }
-
             setEraserMode(mode) {
                 this.eraserMode = mode;
                 this.updateActiveStates();
@@ -846,13 +1145,6 @@
             updateActiveStates() {
                 ['penBtn', 'eraserBtn', 'lassoBtn'].forEach(id => document.getElementById(id).classList.remove('active'));
                 document.getElementById(this.currentTool + 'Btn').classList.add('active');
-                document.getElementById('lightModeBtn').classList.toggle('active', this.mode === 'light');
-                document.getElementById('darkModeBtn').classList.toggle('active', this.mode === 'dark');
-                document.getElementById('cleanBtn').classList.toggle('active', this.backgroundStyle === 'clean');
-                document.getElementById('gridBtn').classList.toggle('active', this.backgroundStyle === 'grid');
-                document.getElementById('linesBtn').classList.toggle('active', this.backgroundStyle === 'lines');
-                document.getElementById('pixelEraserBtn').classList.toggle('active', this.eraserMode === 'area');
-                document.getElementById('strokeEraserBtn').classList.toggle('active', this.eraserMode === 'stroke');
                 document.getElementById('selectionActions').classList.toggle('visible', this.selectedIds.size > 0 || this.clipboardItems.length > 0);
             }
 
@@ -964,11 +1256,11 @@
             getPos(e) {
                 const rect = this.canvas.getBoundingClientRect();
                 const point = e.touches ? e.touches[0] : e;
-                const x = (point.clientX - rect.left) * (this.canvas.width / rect.width);
-                const y = (point.clientY - rect.top) * (this.canvas.height / rect.height);
+                const x = (point.clientX - rect.left) * (this.canvasWidth / rect.width);
+                const y = (point.clientY - rect.top) * (this.canvasHeight / rect.height);
                 return {
-                    x: Math.max(0, Math.min(x, this.canvas.width)),
-                    y: Math.max(0, Math.min(y, this.canvas.height))
+                    x: Math.max(0, Math.min(x, this.canvasWidth)),
+                    y: Math.max(0, Math.min(y, this.canvasHeight))
                 };
             }
 
@@ -1130,7 +1422,6 @@
 
             startAutosave() {
                 setInterval(() => this.saveAutosave(), 30000);
-                // Auto-save current note every 10 seconds if a note is loaded
                 setInterval(() => this.autoSaveCurrentNote(), 10000);
             }
 
@@ -1140,7 +1431,6 @@
                 const noteIndex = notes.findIndex(n => n.id === this.currentNoteId);
                 if (noteIndex === -1) return;
                 
-                // Update the existing note with current drawing
                 const updatedNote = {
                     ...notes[noteIndex],
                     updatedAt: new Date().toISOString(),
@@ -1156,19 +1446,7 @@
                 this.saveNotes(notes);
                 this.syncNoteToFolder(updatedNote);
                 this.dirty = false;
-                
-                // Update timestamp in UI if visible
                 this.loadNotes();
-                
-                // Visual feedback (flash the performance badge briefly)
-                const badge = document.getElementById('perfBadge');
-                const originalText = badge.textContent;
-                badge.textContent = '💾 Auto-saved';
-                badge.style.color = '#0f0';
-                setTimeout(() => {
-                    badge.textContent = originalText;
-                    badge.style.color = '#0f0';
-                }, 1000);
             }
 
             saveAutosave(force = false) {
@@ -1400,7 +1678,6 @@
                 this.saveNotes(notes);
                 await this.syncNoteToFolder(note);
                 
-                // Set as current note for auto-save
                 this.currentNoteId = note.id;
                 
                 document.getElementById('noteTitle').value = '';
@@ -1438,7 +1715,6 @@
                 const note = notes.find(n => n.id === id);
                 if (!note) return;
 
-                // Set as current note for auto-save
                 this.currentNoteId = note.id;
 
                 if (note.stateData && Array.isArray(note.stateData.items)) {
@@ -1676,14 +1952,6 @@
         }
 
         const whiteboard = new OptimizedWhiteboard();
-        document.getElementById('saveNoteBtn').addEventListener('click', () => whiteboard.saveNote());
-        whiteboard.loadNotes();
-
-        const sidebar = document.querySelector('.notes-sidebar');
-        const toggleBtn = document.getElementById('toggleSidebarBtn');
-        toggleBtn.addEventListener('click', () => {
-            sidebar.classList.toggle('hidden');
-        });
     </script>
 </body>
 </html>
