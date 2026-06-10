@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Whiteboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f0f0;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            background: white;
+            padding: 10px 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-bottom: 1px solid #ddd;
+        }
+
+        .tool-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 0 10px;
+            border-right: 1px solid #ddd;
+        }
+
+        .tool-group:last-child {
+            border-right: none;
+        }
+
+        button {
+            padding: 8px 15px;
+            border: 1px solid #ccc;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #e0e0e0;
+            transform: translateY(-1px);
+        }
+
+        button.active {
+            background: #007acc;
+            color: white;
+            border-color: #007acc;
+        }
+
+        input[type="color"] {
+            width: 40px;
+            height: 35px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        input[type="range"] {
+            width: 120px;
+        }
+
+        label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 70px);
+            position: relative;
+        }
+
+        .canvas-container {
+            flex: 1;
+            background: #f0f0f0;
+            cursor: crosshair;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .quick-pens {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .favorite-pen {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            border-radius: 6px;
+            position: relative;
+        }
+
+        .favorite-pen::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: var(--dot-size, 10px);
+            height: var(--dot-size, 10px);
+            background: var(--pen-color, #000);
+            border-radius: 999px;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+        }
+
+        .selection-actions {
+            display: none;
+        }
+
+        .selection-actions.visible {
+            display: flex;
+        }
+
+        .notes-sidebar {
+            width: 280px;
+            background: white;
+            border-left: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            gap: 15px;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            position: relative;
+            z-index: 10;
+        }
+
+        .notes-sidebar.hidden {
+            transform: translateX(100%);
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+        }
+
+        .toggle-sidebar-btn {
+            position: fixed;
+            right: 10px;
+            bottom: 20px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 20;
+            transition: all 0.2s;
+        }
+
+        .toggle-sidebar-btn:hover {
+            background: #005999;
+            transform: scale(1.05);
+        }
+
+        .notes-header {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #007acc;
+        }
+
+        .note-input-area {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .note-input-area input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .note-input-area button {
+            background: #007acc;
+            color: white;
+            border: none;
+        }
+
+        .note-input-area button:hover {
+            background: #005999;
+        }
+
+        .notes-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .note-item {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .note-item:hover {
+            background: #f0f0f0;
+            transform: translateX(2px);
+        }
+
+        .note-title {
+            font-weight: 500;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .note-date {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .note-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 11px;
+            color: #777;
+            margin-top: 4px;
+        }
+
+        .note-actions {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .note-actions button {
+            flex: 1;
+            padding: 4px;
+            font-size: 12px;
+            background: white;
+            border: 1px solid #ddd;
+        }
+
+        .note-actions button:hover {
+            background: #e0e0e0;
+        }
+
+        .pin-label {
+            color: #007acc;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div class="tool-group">
+            <button id="penBtn" class="active">✏️ Pen</button>
+            <button id="eraserBtn">🧽 Eraser</button>
+            <button id="lassoBtn">Lasso</button>
+            <button id="clearBtn">🗑️ Clear</button>
+            <button id="undoBtn">↩️ Undo</button>
+            <button id="redoBtn">↪️ Redo</button>
+        </div>
+        
+        <div class="tool-group">
+            <label>🎨 Color:</label>
+            <input type="color" id="colorPicker" value="#000000">
+        </div>
+        
+        <div class="tool-group">
+            <label>✏️ Size:</label>
+            <input type="range" id="brushSize" min="1" max="20" value="3">
+            <span id="sizeValue">3px</span>
+        </div>
+
+        <div class="tool-group">
+            <label>Eraser:</label>
+            <button id="pixelEraserBtn" class="active">Area</button>
+            <button id="strokeEraserBtn">Stroke</button>
+            <input type="range" id="eraserSize" min="4" max="60" value="18">
+            <span id="eraserSizeValue">18px</span>
+        </div>
+
+        <div class="tool-group">
+            <label>Quick pens:</label>
+            <div class="quick-pens" id="quickPens"></div>
+            <button id="saveFavoritePenBtn">Save</button>
+        </div>
+
+        <div class="tool-group">
+            <label>🌓 Mode:</label>
+            <button id="lightModeBtn" class="active">☀️ Light</button>
+            <button id="darkModeBtn">🌙 Dark</button>
+        </div>
+
+        <div class="tool-group">
+            <label>📐 Background:</label>
+            <button id="cleanBtn" class="active">Clean</button>
+            <button id="gridBtn">Grid</button>
+            <button id="linesBtn">Lines</button>
+        </div>
+
+        <div class="tool-group selection-actions" id="selectionActions">
+            <button id="copySelectionBtn">Copy</button>
+            <button id="cutSelectionBtn">Cut</button>
+            <button id="pasteSelectionBtn">Paste</button>
+            <button id="deleteSelectionBtn">Delete selection</button>
+            <button id="clearSelectionBtn">Clear selection</button>
+        </div>
+        
+        <div class="tool-group">
+            <button id="exportBtn">📸 Export Image</button>
+        </div>
+    </div>
+
+    <button class="toggle-sidebar-btn" id="toggleSidebarBtn">📋</button>
+
+    <div class="main-container">
+        <div class="canvas-container">
+            <canvas id="whiteboard"></canvas>
+        </div>
+        <div class="notes-sidebar">
+            <div class="notes-header">📝 Saved Notes</div>
+            <div class="note-input-area">
+                <input type="text" id="noteTitle" placeholder="Note title...">
+                <input type="datetime-local" id="noteDateTime">
+                <button id="chooseNotesFolderBtn">Choose notes folder</button>
+                <div class="note-date" id="folderSyncStatus">Folder sync not connected</div>
+                <button id="saveNoteBtn">💾 Save Current Drawing</button>
+            </div>
+            <div class="notes-list" id="notesList"></div>
+        </div>
+    </div>
+
+    <script>
+        class Whiteboard {
+            constructor() {
+                this.canvas = document.getElementById('whiteboard');
+                this.ctx = this.canvas.getContext('2d');
+                this.layerCanvas = document.createElement('canvas');
+                this.layerCtx = this.layerCanvas.getContext('2d');
+                this.container = this.canvas.parentElement;
+                this.items = [];
+                this.history = [];
+                this.historyIndex = -1;
+                this.clipboardItems = [];
+                this.selectedIds = new Set();
+                this.isDrawing = false;
+                this.currentTool = 'pen';
+                this.currentColor = '#000000';
+                this.brushSize = 3;
+                this.eraserSize = 18;
+                this.eraserMode = 'area';
+                this.mode = 'light';
+                this.backgroundStyle = 'clean';
+                this.canvasHeight = 0;
+                this.currentStroke = null;
+                this.currentLasso = null;
+                this.erasedDuringStroke = false;
+                this.dirty = false;
+                this.notesFolderHandle = null;
+                this.favoritePens = this.loadFavoritePens();
+                this.init();
+            }
+
+            init() {
+                this.resizeCanvas();
+                this.setupEventListeners();
+                this.renderFavoritePens();
+                if (!this.loadAutosave()) this.saveState();
+                this.setDefaultNoteDateTime();
+                this.restoreNotesFolderHandle();
+                this.renderCanvas();
+                this.startAutosave();
+            }
+
+            resizeCanvas() {
+                const width = Math.max(320, this.container.clientWidth);
+                const height = Math.max(this.container.clientHeight * 2, this.canvasHeight, 1600);
+                this.canvas.width = width;
+                this.canvas.height = height;
+                this.layerCanvas.width = width;
+                this.layerCanvas.height = height;
+                this.canvas.style.height = height + 'px';
+                this.canvasHeight = height;
+                this.renderCanvas();
+            }
+
+            ensureCanvasFor(y) {
+                if (y < this.canvasHeight - 500) return;
+                this.extendCanvas();
+            }
+
+            extendCanvas() {
+                this.canvasHeight += 1200;
+                this.canvas.height = this.canvasHeight;
+                this.layerCanvas.height = this.canvasHeight;
+                this.canvas.style.height = this.canvasHeight + 'px';
+                this.renderCanvas();
+            }
+
+            getBgColor() {
+                return this.mode === 'dark' ? '#17191d' : '#fffdf8';
+            }
+
+            getGridColor() {
+                return this.mode === 'dark' ? 'rgba(210, 221, 232, 0.13)' : 'rgba(76, 98, 122, 0.23)';
+            }
+
+            getLinesColor() {
+                return this.mode === 'dark' ? 'rgba(210, 221, 232, 0.15)' : 'rgba(61, 94, 128, 0.25)';
+            }
+
+            renderCanvas() {
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'source-over';
+                this.ctx.fillStyle = this.getBgColor();
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (this.backgroundStyle === 'grid') this.drawGrid();
+                if (this.backgroundStyle === 'lines') this.drawLines();
+
+                this.layerCtx.clearRect(0, 0, this.layerCanvas.width, this.layerCanvas.height);
+                this.items.forEach(item => this.drawItem(item, this.layerCtx));
+                if (this.currentStroke && this.currentStroke.type !== 'stroke-eraser') {
+                    this.drawItem(this.currentStroke, this.layerCtx);
+                }
+                this.ctx.drawImage(this.layerCanvas, 0, 0);
+                if (this.currentStroke && this.currentStroke.type === 'stroke-eraser') {
+                    this.drawEraserPreview(this.currentStroke);
+                }
+                this.drawSelection();
+                this.drawLassoPreview();
+                this.ctx.restore();
+            }
+
+            drawGrid() {
+                const size = 30;
+                this.ctx.save();
+                this.ctx.strokeStyle = this.getGridColor();
+                this.ctx.lineWidth = 1;
+                for (let x = size; x < this.canvas.width; x += size) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x + 0.5, 0);
+                    this.ctx.lineTo(x + 0.5, this.canvas.height);
+                    this.ctx.stroke();
+                }
+                for (let y = size; y < this.canvas.height; y += size) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y + 0.5);
+                    this.ctx.lineTo(this.canvas.width, y + 0.5);
+                    this.ctx.stroke();
+                }
+                this.ctx.restore();
+            }
+
+            drawLines() {
+                const spacing = 32;
+                this.ctx.save();
+                this.ctx.strokeStyle = this.getLinesColor();
+                this.ctx.lineWidth = 1;
+                for (let y = spacing; y < this.canvas.height; y += spacing) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y + 0.5);
+                    this.ctx.lineTo(this.canvas.width, y + 0.5);
+                    this.ctx.stroke();
+                }
+                this.ctx.restore();
+            }
+
+            drawItem(item, targetCtx = this.ctx) {
+                if (item.type === 'image') {
+                    const img = item.imageElement;
+                    if (img) targetCtx.drawImage(img, 0, 0, this.canvas.width, item.height || this.canvas.height);
+                    return;
+                }
+
+                if (item.type === 'stroke-eraser') {
+                    this.drawEraserPreview(item);
+                    return;
+                }
+
+                if (!item.points || item.points.length === 0) return;
+                targetCtx.save();
+                if (item.type === 'eraser') targetCtx.globalCompositeOperation = 'destination-out';
+                targetCtx.strokeStyle = item.type === 'eraser' ? '#000000' : item.color;
+                targetCtx.fillStyle = item.type === 'eraser' ? '#000000' : item.color;
+                targetCtx.lineWidth = item.width;
+                targetCtx.lineCap = 'round';
+                targetCtx.lineJoin = 'round';
+
+                if (item.points.length === 1) {
+                    const p = item.points[0];
+                    targetCtx.beginPath();
+                    targetCtx.arc(p.x, p.y, item.width / 2, 0, Math.PI * 2);
+                    targetCtx.fill();
+                } else {
+                    this.drawSmoothPath(targetCtx, item.points);
+                }
+                targetCtx.restore();
+            }
+
+            drawSmoothPath(targetCtx, points) {
+                if (points.length < 2) return;
+                targetCtx.beginPath();
+                targetCtx.moveTo(points[0].x, points[0].y);
+
+                if (points.length === 2) {
+                    targetCtx.lineTo(points[1].x, points[1].y);
+                    targetCtx.stroke();
+                    return;
+                }
+
+                for (let i = 1; i < points.length - 1; i++) {
+                    const midX = (points[i].x + points[i + 1].x) / 2;
+                    const midY = (points[i].y + points[i + 1].y) / 2;
+                    targetCtx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+                }
+
+                const last = points[points.length - 1];
+                targetCtx.lineTo(last.x, last.y);
+                targetCtx.stroke();
+            }
+
+            drawStrokeTail(targetCtx, item) {
+                const points = item.points;
+                if (!points || points.length < 2) return;
+
+                targetCtx.save();
+                if (item.type === 'eraser') targetCtx.globalCompositeOperation = 'destination-out';
+                targetCtx.strokeStyle = item.type === 'eraser' ? '#000000' : item.color;
+                targetCtx.lineWidth = item.width;
+                targetCtx.lineCap = 'round';
+                targetCtx.lineJoin = 'round';
+                targetCtx.beginPath();
+
+                if (points.length === 2) {
+                    targetCtx.moveTo(points[0].x, points[0].y);
+                    targetCtx.lineTo(points[1].x, points[1].y);
+                } else {
+                    const a = points[points.length - 3];
+                    const b = points[points.length - 2];
+                    const c = points[points.length - 1];
+                    const startX = (a.x + b.x) / 2;
+                    const startY = (a.y + b.y) / 2;
+                    const endX = (b.x + c.x) / 2;
+                    const endY = (b.y + c.y) / 2;
+                    targetCtx.moveTo(startX, startY);
+                    targetCtx.quadraticCurveTo(b.x, b.y, endX, endY);
+                }
+
+                targetCtx.stroke();
+                targetCtx.restore();
+            }
+
+            drawEraserPreview(item) {
+                if (!item.points || item.points.length === 0) return;
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'source-over';
+                this.ctx.strokeStyle = this.mode === 'dark' ? 'rgba(238, 246, 255, 0.55)' : 'rgba(37, 99, 150, 0.45)';
+                this.ctx.lineWidth = item.width;
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+                this.ctx.setLineDash([2, 8]);
+                this.drawSmoothPath(this.ctx, item.points);
+                this.ctx.restore();
+            }
+
+            drawSelection() {
+                if (this.selectedIds.size === 0) return;
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'source-over';
+                this.ctx.strokeStyle = this.mode === 'dark' ? '#6ee7ff' : '#007acc';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([8, 7]);
+                this.items.forEach(item => {
+                    if (!this.selectedIds.has(item.id) || item.type !== 'stroke') return;
+                    const box = this.getStrokeBounds(item);
+                    this.ctx.strokeRect(box.minX - 8, box.minY - 8, box.maxX - box.minX + 16, box.maxY - box.minY + 16);
+                });
+                this.ctx.restore();
+            }
+
+            drawLassoPreview() {
+                if (!this.currentLasso || this.currentLasso.length < 2) return;
+                this.ctx.save();
+                this.ctx.strokeStyle = this.mode === 'dark' ? '#6ee7ff' : '#007acc';
+                this.ctx.fillStyle = this.mode === 'dark' ? 'rgba(110, 231, 255, 0.08)' : 'rgba(0, 122, 204, 0.08)';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([7, 7]);
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.currentLasso[0].x, this.currentLasso[0].y);
+                for (let i = 1; i < this.currentLasso.length; i++) this.ctx.lineTo(this.currentLasso[i].x, this.currentLasso[i].y);
+                this.ctx.closePath();
+                this.ctx.fill();
+                this.ctx.stroke();
+                this.ctx.restore();
+            }
+
+            setupEventListeners() {
+                this.canvas.addEventListener('pointerdown', (e) => this.startDraw(e));
+                this.canvas.addEventListener('pointermove', (e) => this.draw(e));
+                this.canvas.addEventListener('pointerup', (e) => this.stopDraw(e));
+                this.canvas.addEventListener('pointercancel', (e) => this.stopDraw(e));
+                this.canvas.addEventListener('lostpointercapture', (e) => this.stopDraw(e));
+
+                document.getElementById('penBtn').onclick = () => this.setTool('pen');
+                document.getElementById('eraserBtn').onclick = () => this.setTool('eraser');
+                document.getElementById('lassoBtn').onclick = () => this.setTool('lasso');
+                document.getElementById('clearBtn').onclick = () => this.clear();
+                document.getElementById('undoBtn').onclick = () => this.undo();
+                document.getElementById('redoBtn').onclick = () => this.redo();
+                document.getElementById('copySelectionBtn').onclick = () => this.copySelection();
+                document.getElementById('cutSelectionBtn').onclick = () => this.cutSelection();
+                document.getElementById('pasteSelectionBtn').onclick = () => this.pasteSelection();
+                document.getElementById('deleteSelectionBtn').onclick = () => this.deleteSelection();
+                document.getElementById('clearSelectionBtn').onclick = () => this.clearSelection();
+                document.getElementById('saveFavoritePenBtn').onclick = () => this.saveFavoritePen();
+                document.getElementById('exportBtn').onclick = () => this.export();
+                document.getElementById('chooseNotesFolderBtn').onclick = () => this.chooseNotesFolder();
+
+                document.getElementById('colorPicker').onchange = (e) => this.currentColor = e.target.value;
+                document.getElementById('brushSize').oninput = (e) => {
+                    this.brushSize = parseInt(e.target.value, 10);
+                    document.getElementById('sizeValue').innerText = this.brushSize + 'px';
+                };
+                document.getElementById('eraserSize').oninput = (e) => {
+                    this.eraserSize = parseInt(e.target.value, 10);
+                    document.getElementById('eraserSizeValue').innerText = this.eraserSize + 'px';
+                };
+
+                document.getElementById('pixelEraserBtn').onclick = () => this.setEraserMode('area');
+                document.getElementById('strokeEraserBtn').onclick = () => this.setEraserMode('stroke');
+                document.getElementById('lightModeBtn').onclick = () => this.setMode('light');
+                document.getElementById('darkModeBtn').onclick = () => this.setMode('dark');
+                document.getElementById('cleanBtn').onclick = () => this.setBackground('clean');
+                document.getElementById('gridBtn').onclick = () => this.setBackground('grid');
+                document.getElementById('linesBtn').onclick = () => this.setBackground('lines');
+                this.container.addEventListener('scroll', () => {
+                    const nearBottom = this.container.scrollTop + this.container.clientHeight > this.container.scrollHeight - 450;
+                    if (nearBottom) this.extendCanvas();
+                });
+                document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+                window.addEventListener('beforeunload', () => this.saveAutosave(true));
+                window.addEventListener('resize', () => this.resizeCanvas());
+                this.updateActiveStates();
+            }
+
+            handleKeyboard(e) {
+                const activeTag = document.activeElement ? document.activeElement.tagName : '';
+                if (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag)) return;
+                const hasModifier = e.ctrlKey || e.metaKey;
+
+                if (hasModifier && e.shiftKey && e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    this.redo();
+                } else if (hasModifier && e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    this.undo();
+                } else if (hasModifier && e.key.toLowerCase() === 'y') {
+                    e.preventDefault();
+                    this.redo();
+                } else if (hasModifier && e.key.toLowerCase() === 'c') {
+                    e.preventDefault();
+                    this.copySelection();
+                } else if (hasModifier && e.key.toLowerCase() === 'x') {
+                    e.preventDefault();
+                    this.cutSelection();
+                } else if (hasModifier && e.key.toLowerCase() === 'v') {
+                    e.preventDefault();
+                    this.pasteSelection();
+                } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (this.selectedIds.size > 0) {
+                        e.preventDefault();
+                        this.deleteSelection();
+                    }
+                }
+            }
+
+            setTool(tool) {
+                this.currentTool = tool;
+                if (tool !== 'lasso') this.clearSelection(false);
+                this.updateActiveStates();
+            }
+
+            setMode(mode) {
+                this.mode = mode;
+                this.dirty = true;
+                this.updateActiveStates();
+                this.renderCanvas();
+            }
+
+            setBackground(style) {
+                this.backgroundStyle = style;
+                this.dirty = true;
+                this.updateActiveStates();
+                this.renderCanvas();
+            }
+
+            setEraserMode(mode) {
+                this.eraserMode = mode;
+                this.updateActiveStates();
+            }
+
+            updateActiveStates() {
+                ['penBtn', 'eraserBtn', 'lassoBtn'].forEach(id => document.getElementById(id).classList.remove('active'));
+                document.getElementById(this.currentTool + 'Btn').classList.add('active');
+                document.getElementById('lightModeBtn').classList.toggle('active', this.mode === 'light');
+                document.getElementById('darkModeBtn').classList.toggle('active', this.mode === 'dark');
+                document.getElementById('cleanBtn').classList.toggle('active', this.backgroundStyle === 'clean');
+                document.getElementById('gridBtn').classList.toggle('active', this.backgroundStyle === 'grid');
+                document.getElementById('linesBtn').classList.toggle('active', this.backgroundStyle === 'lines');
+                document.getElementById('pixelEraserBtn').classList.toggle('active', this.eraserMode === 'area');
+                document.getElementById('strokeEraserBtn').classList.toggle('active', this.eraserMode === 'stroke');
+                document.getElementById('selectionActions').classList.toggle('visible', this.selectedIds.size > 0 || this.clipboardItems.length > 0);
+            }
+
+            startDraw(e) {
+                e.preventDefault();
+                if (e.pointerId !== undefined) this.canvas.setPointerCapture(e.pointerId);
+                const pos = this.getPos(e);
+                this.ensureCanvasFor(pos.y);
+                this.isDrawing = true;
+                this.erasedDuringStroke = false;
+
+                if (this.currentTool === 'lasso') {
+                    this.currentLasso = [pos];
+                    this.renderCanvas();
+                    return;
+                }
+
+                if (this.currentTool === 'eraser' && this.eraserMode === 'stroke') {
+                    this.currentStroke = { type: 'stroke-eraser', points: [pos], width: this.eraserSize };
+                    this.eraseIntersectingStrokes(pos, pos);
+                    this.renderCanvas();
+                    return;
+                }
+
+                this.currentStroke = {
+                    id: this.createId(),
+                    type: this.currentTool === 'eraser' ? 'eraser' : 'stroke',
+                    color: this.currentColor,
+                    width: this.currentTool === 'eraser' ? this.eraserSize : this.brushSize,
+                    points: [pos]
+                };
+                this.renderCanvas();
+            }
+
+            draw(e) {
+                if (!this.isDrawing) return;
+                e.preventDefault();
+                const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+                let needsFullRender = false;
+                for (const pointerEvent of events) {
+                    needsFullRender = this.appendDrawPoint(this.getPos(pointerEvent)) || needsFullRender;
+                }
+                if (needsFullRender) this.renderCanvas();
+            }
+
+            appendDrawPoint(pos) {
+                this.ensureCanvasFor(pos.y);
+
+                if (this.currentTool === 'lasso') {
+                    this.currentLasso.push(pos);
+                    return true;
+                }
+
+                if (!this.currentStroke) return false;
+                const last = this.currentStroke.points[this.currentStroke.points.length - 1];
+                if (Math.hypot(pos.x - last.x, pos.y - last.y) < 0.4) return false;
+                this.currentStroke.points.push(pos);
+
+                if (this.currentTool === 'eraser' && this.eraserMode === 'stroke') {
+                    this.eraseIntersectingStrokes(last, pos);
+                    return true;
+                }
+
+                if (this.currentTool === 'pen') {
+                    this.drawStrokeTail(this.layerCtx, this.currentStroke);
+                    this.drawStrokeTail(this.ctx, this.currentStroke);
+                    return false;
+                }
+
+                return true;
+            }
+
+            stopDraw(e) {
+                if (!this.isDrawing) return;
+                if (e && e.pointerId !== undefined && this.canvas.hasPointerCapture(e.pointerId)) {
+                    this.canvas.releasePointerCapture(e.pointerId);
+                }
+                this.isDrawing = false;
+
+                if (this.currentTool === 'lasso') {
+                    this.selectWithLasso();
+                    this.currentLasso = null;
+                    this.renderCanvas();
+                    this.updateActiveStates();
+                    return;
+                }
+
+                if (this.currentTool === 'eraser' && this.eraserMode === 'stroke') {
+                    this.currentStroke = null;
+                    if (this.erasedDuringStroke) this.saveState();
+                    this.renderCanvas();
+                    return;
+                }
+
+                if (this.currentStroke) {
+                    this.items.push(this.currentStroke);
+                    this.currentStroke = null;
+                    this.saveState();
+                    this.renderCanvas();
+                }
+            }
+
+            getPos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const point = e.touches ? e.touches[0] : e;
+                const x = (point.clientX - rect.left) * (this.canvas.width / rect.width);
+                const y = (point.clientY - rect.top) * (this.canvas.height / rect.height);
+                return {
+                    x: Math.max(0, Math.min(x, this.canvas.width)),
+                    y: Math.max(0, Math.min(y, this.canvas.height))
+                };
+            }
+
+            eraseIntersectingStrokes(a, b) {
+                const radius = this.eraserSize / 2;
+                const before = this.items.length;
+                this.items = this.items.filter(item => {
+                    if (item.type !== 'stroke') return true;
+                    return !this.strokeIntersectsSegment(item, a, b, radius + item.width / 2);
+                });
+                if (this.items.length !== before) {
+                    this.erasedDuringStroke = true;
+                    this.selectedIds.clear();
+                    this.updateActiveStates();
+                }
+            }
+
+            strokeIntersectsSegment(stroke, a, b, tolerance) {
+                if (stroke.points.length === 1) return this.distancePointToSegment(stroke.points[0], a, b) <= tolerance;
+                for (let i = 1; i < stroke.points.length; i++) {
+                    if (this.segmentsNear(stroke.points[i - 1], stroke.points[i], a, b, tolerance)) return true;
+                }
+                return false;
+            }
+
+            segmentsNear(a, b, c, d, tolerance) {
+                return this.distancePointToSegment(a, c, d) <= tolerance ||
+                    this.distancePointToSegment(b, c, d) <= tolerance ||
+                    this.distancePointToSegment(c, a, b) <= tolerance ||
+                    this.distancePointToSegment(d, a, b) <= tolerance ||
+                    this.segmentsCross(a, b, c, d);
+            }
+
+            distancePointToSegment(p, a, b) {
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                if (dx === 0 && dy === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+                const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
+                return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+            }
+
+            segmentsCross(a, b, c, d) {
+                const ccw = (p1, p2, p3) => (p3.y - p1.y) * (p2.x - p1.x) > (p2.y - p1.y) * (p3.x - p1.x);
+                return ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d);
+            }
+
+            selectWithLasso() {
+                if (!this.currentLasso || this.currentLasso.length < 3) return;
+                this.selectedIds.clear();
+                this.items.forEach(item => {
+                    if (item.type !== 'stroke') return;
+                    if (this.strokeInPolygon(item, this.currentLasso)) this.selectedIds.add(item.id);
+                });
+            }
+
+            strokeInPolygon(stroke, polygon) {
+                if (stroke.points.some(p => this.pointInPolygon(p, polygon))) return true;
+                for (let i = 1; i < stroke.points.length; i++) {
+                    for (let j = 0; j < polygon.length; j++) {
+                        const next = (j + 1) % polygon.length;
+                        if (this.segmentsCross(stroke.points[i - 1], stroke.points[i], polygon[j], polygon[next])) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            pointInPolygon(point, polygon) {
+                let inside = false;
+                for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                    const xi = polygon[i].x, yi = polygon[i].y;
+                    const xj = polygon[j].x, yj = polygon[j].y;
+                    const intersect = ((yi > point.y) !== (yj > point.y)) &&
+                        (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                }
+                return inside;
+            }
+
+            copySelection() {
+                if (this.selectedIds.size === 0) return;
+                this.clipboardItems = this.items
+                    .filter(item => this.selectedIds.has(item.id) && item.type === 'stroke')
+                    .map(item => this.serializeItem(item));
+                this.updateActiveStates();
+            }
+
+            cutSelection() {
+                if (this.selectedIds.size === 0) return;
+                this.copySelection();
+                this.deleteSelection();
+            }
+
+            pasteSelection() {
+                if (!this.clipboardItems || this.clipboardItems.length === 0) return;
+                const pasted = this.clipboardItems.map(item => {
+                    const copy = JSON.parse(JSON.stringify(item));
+                    copy.id = this.createId();
+                    copy.points = copy.points.map(point => ({ x: point.x + 28, y: point.y + 28 }));
+                    return copy;
+                });
+
+                const maxY = Math.max(...pasted.flatMap(item => item.points.map(point => point.y)));
+                this.ensureCanvasFor(maxY);
+                this.items.push(...pasted);
+                this.selectedIds = new Set(pasted.map(item => item.id));
+                this.clipboardItems = pasted.map(item => this.serializeItem(item));
+                this.saveState();
+                this.renderCanvas();
+                this.updateActiveStates();
+            }
+
+            deleteSelection() {
+                if (this.selectedIds.size === 0) return;
+                this.items = this.items.filter(item => !this.selectedIds.has(item.id));
+                this.selectedIds.clear();
+                this.saveState();
+                this.renderCanvas();
+                this.updateActiveStates();
+            }
+
+            clearSelection(render = true) {
+                this.selectedIds.clear();
+                this.updateActiveStates();
+                if (render) this.renderCanvas();
+            }
+
+            getStrokeBounds(stroke) {
+                const xs = stroke.points.map(p => p.x);
+                const ys = stroke.points.map(p => p.y);
+                return {
+                    minX: Math.min(...xs),
+                    minY: Math.min(...ys),
+                    maxX: Math.max(...xs),
+                    maxY: Math.max(...ys)
+                };
+            }
+
+            saveState() {
+                this.history = this.history.slice(0, this.historyIndex + 1);
+                this.history.push(JSON.stringify(this.items.map(item => this.serializeItem(item))));
+                this.historyIndex = this.history.length - 1;
+                this.dirty = true;
+                if (this.history.length > 80) {
+                    this.history.shift();
+                    this.historyIndex--;
+                }
+            }
+
+            startAutosave() {
+                setInterval(() => this.saveAutosave(), 5000);
+            }
+
+            saveAutosave(force = false) {
+                if (!force && !this.dirty) return;
+                const payload = {
+                    items: this.items.map(item => this.serializeItem(item)),
+                    mode: this.mode,
+                    backgroundStyle: this.backgroundStyle,
+                    canvasHeight: this.canvasHeight,
+                    updatedAt: new Date().toISOString()
+                };
+                localStorage.setItem('whiteboard_autosave', JSON.stringify(payload));
+                this.dirty = false;
+            }
+
+            loadAutosave() {
+                const saved = localStorage.getItem('whiteboard_autosave');
+                if (!saved) return false;
+                try {
+                    const payload = JSON.parse(saved);
+                    if (!payload || !Array.isArray(payload.items)) return false;
+                    this.items = payload.items;
+                    this.mode = payload.mode || this.mode;
+                    this.backgroundStyle = payload.backgroundStyle || this.backgroundStyle;
+                    if (payload.canvasHeight && payload.canvasHeight > this.canvasHeight) {
+                        this.canvasHeight = payload.canvasHeight;
+                        this.canvas.height = this.canvasHeight;
+                        this.layerCanvas.height = this.canvasHeight;
+                        this.canvas.style.height = this.canvasHeight + 'px';
+                    }
+                    this.history = [JSON.stringify(this.items.map(item => this.serializeItem(item)))];
+                    this.historyIndex = 0;
+                    this.hydrateImages();
+                    this.updateActiveStates();
+                    return true;
+                } catch (error) {
+                    return false;
+                }
+            }
+
+            serializeItem(item) {
+                const copy = { ...item };
+                delete copy.imageElement;
+                return copy;
+            }
+
+            restoreState() {
+                this.items = JSON.parse(this.history[this.historyIndex] || '[]');
+                this.selectedIds.clear();
+                this.hydrateImages();
+                this.renderCanvas();
+                this.updateActiveStates();
+            }
+
+            undo() {
+                if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                    this.restoreState();
+                }
+            }
+
+            redo() {
+                if (this.historyIndex < this.history.length - 1) {
+                    this.historyIndex++;
+                    this.restoreState();
+                }
+            }
+
+            clear() {
+                this.items = [];
+                this.selectedIds.clear();
+                this.saveState();
+                this.renderCanvas();
+                this.updateActiveStates();
+            }
+
+            export() {
+                this.renderCanvas();
+                const link = document.createElement('a');
+                link.download = 'whiteboard.png';
+                link.href = this.canvas.toDataURL();
+                link.click();
+            }
+
+            loadFavoritePens() {
+                const saved = JSON.parse(localStorage.getItem('whiteboard_favorite_pens') || 'null');
+                return saved || [
+                    { color: '#111827', width: 3 },
+                    { color: '#1d4ed8', width: 4 },
+                    { color: '#b91c1c', width: 4 },
+                    { color: '#047857', width: 4 }
+                ];
+            }
+
+            saveFavoritePen() {
+                const pen = { color: this.currentColor, width: this.brushSize };
+                this.favoritePens = this.favoritePens.filter(item => item.color !== pen.color || item.width !== pen.width);
+                this.favoritePens.unshift(pen);
+                this.favoritePens = this.favoritePens.slice(0, 8);
+                localStorage.setItem('whiteboard_favorite_pens', JSON.stringify(this.favoritePens));
+                this.renderFavoritePens();
+            }
+
+            renderFavoritePens() {
+                const quickPens = document.getElementById('quickPens');
+                quickPens.innerHTML = this.favoritePens.map((pen, index) => `
+                    <button class="favorite-pen" data-index="${index}" title="${pen.color}, ${pen.width}px" style="--pen-color:${pen.color}; --dot-size:${Math.max(8, pen.width + 7)}px"></button>
+                `).join('');
+                quickPens.querySelectorAll('.favorite-pen').forEach(button => {
+                    button.addEventListener('click', () => this.applyFavoritePen(parseInt(button.dataset.index, 10)));
+                    button.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        this.favoritePens.splice(parseInt(button.dataset.index, 10), 1);
+                        localStorage.setItem('whiteboard_favorite_pens', JSON.stringify(this.favoritePens));
+                        this.renderFavoritePens();
+                    });
+                });
+            }
+
+            applyFavoritePen(index) {
+                const pen = this.favoritePens[index];
+                if (!pen) return;
+                this.currentColor = pen.color;
+                this.brushSize = pen.width;
+                document.getElementById('colorPicker').value = pen.color;
+                document.getElementById('brushSize').value = pen.width;
+                document.getElementById('sizeValue').innerText = pen.width + 'px';
+                this.setTool('pen');
+            }
+
+            async chooseNotesFolder() {
+                const status = document.getElementById('folderSyncStatus');
+                if (!window.showDirectoryPicker) {
+                    status.textContent = 'Folder sync needs Chrome or Edge with File System Access support';
+                    return;
+                }
+
+                try {
+                    this.notesFolderHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                    await this.storeNotesFolderHandle(this.notesFolderHandle);
+                    status.textContent = `Folder sync connected: ${this.notesFolderHandle.name}`;
+                    await this.syncAllNotesToFolder();
+                } catch (error) {
+                    status.textContent = 'Folder sync not connected';
+                }
+            }
+
+            async restoreNotesFolderHandle() {
+                if (!window.showDirectoryPicker || !window.indexedDB) return;
+                try {
+                    const handle = await this.getStoredNotesFolderHandle();
+                    if (!handle) return;
+                    const permission = await handle.queryPermission({ mode: 'readwrite' });
+                    if (permission !== 'granted') return;
+                    this.notesFolderHandle = handle;
+                    document.getElementById('folderSyncStatus').textContent = `Folder sync connected: ${handle.name}`;
+                } catch (error) {
+                }
+            }
+
+            async storeNotesFolderHandle(handle) {
+                if (!window.indexedDB) return;
+                const db = await this.openWhiteboardDb();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction('settings', 'readwrite');
+                    tx.objectStore('settings').put(handle, 'notesFolderHandle');
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                db.close();
+            }
+
+            async getStoredNotesFolderHandle() {
+                const db = await this.openWhiteboardDb();
+                const handle = await new Promise((resolve, reject) => {
+                    const tx = db.transaction('settings', 'readonly');
+                    const request = tx.objectStore('settings').get('notesFolderHandle');
+                    request.onsuccess = () => resolve(request.result || null);
+                    request.onerror = () => reject(request.error);
+                });
+                db.close();
+                return handle;
+            }
+
+            openWhiteboardDb() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open('whiteboard_workspace_sync', 1);
+                    request.onupgradeneeded = () => request.result.createObjectStore('settings');
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async saveNote() {
+                const title = document.getElementById('noteTitle').value.trim();
+                if (!title) {
+                    alert('Please enter a note title');
+                    return;
+                }
+
+                const notes = JSON.parse(localStorage.getItem('whiteboard_notes') || '[]');
+                const now = new Date();
+                const noteDateValue = document.getElementById('noteDateTime').value;
+                const noteDate = noteDateValue ? new Date(noteDateValue) : now;
+                const note = {
+                    id: Date.now(),
+                    title,
+                    pinned: false,
+                    createdAt: now.toISOString(),
+                    updatedAt: now.toISOString(),
+                    noteDate: noteDate.toISOString(),
+                    stateData: {
+                        items: this.items.map(item => this.serializeItem(item)),
+                        mode: this.mode,
+                        backgroundStyle: this.backgroundStyle,
+                        canvasHeight: this.canvasHeight
+                    },
+                    imageData: this.canvas.toDataURL(),
+                    date: noteDate.toLocaleString()
+                };
+                note.fileBaseName = this.getUniqueNoteFileBaseName(note.title, notes, note.id);
+                notes.unshift(note);
+                this.saveNotes(notes);
+                await this.syncNoteToFolder(note);
+                document.getElementById('noteTitle').value = '';
+                this.setDefaultNoteDateTime();
+                this.loadNotes();
+                alert('Note saved successfully!');
+            }
+
+            loadNotes() {
+                const notes = this.getSortedNotes();
+                const notesList = document.getElementById('notesList');
+                if (notes.length === 0) {
+                    notesList.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">No saved notes yet</div>';
+                    return;
+                }
+                notesList.innerHTML = notes.map(note => `
+                    <div class="note-item">
+                        <div class="note-title">${note.pinned ? '<span class="pin-label">Pinned</span> ' : ''}${this.escapeHtml(note.title)}</div>
+                        <div class="note-meta">
+                            <span>${this.escapeHtml(this.formatDate(note.noteDate || note.date || note.createdAt))}</span>
+                            <span>Updated ${this.escapeHtml(this.formatDate(note.updatedAt || note.createdAt || note.date))}</span>
+                        </div>
+                        <div class="note-actions">
+                            <button onclick="whiteboard.loadNote(${note.id})">Load</button>
+                            <button onclick="whiteboard.renameNote(${note.id})">Rename</button>
+                            <button onclick="whiteboard.togglePinNote(${note.id})">${note.pinned ? 'Unpin' : 'Pin'}</button>
+                            <button onclick="whiteboard.deleteNote(${note.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            loadNote(id) {
+                const notes = JSON.parse(localStorage.getItem('whiteboard_notes') || '[]');
+                const note = notes.find(n => n.id === id);
+                if (!note) return;
+
+                if (note.stateData && Array.isArray(note.stateData.items)) {
+                    this.items = note.stateData.items;
+                    this.mode = note.stateData.mode || this.mode;
+                    this.backgroundStyle = note.stateData.backgroundStyle || this.backgroundStyle;
+                    if (note.stateData.canvasHeight && note.stateData.canvasHeight > this.canvasHeight) {
+                        this.canvasHeight = note.stateData.canvasHeight;
+                        this.canvas.height = this.canvasHeight;
+                        this.layerCanvas.height = this.canvasHeight;
+                        this.canvas.style.height = this.canvasHeight + 'px';
+                    }
+                    this.selectedIds.clear();
+                    this.hydrateImages();
+                    this.saveState();
+                    this.renderCanvas();
+                    this.updateActiveStates();
+                    this.dirty = true;
+                    return;
+                }
+
+                const imageItem = {
+                    id: this.createId(),
+                    type: 'image',
+                    imageData: note.imageData,
+                    height: this.canvas.height
+                };
+                const img = new Image();
+                img.onload = () => {
+                    imageItem.imageElement = img;
+                    this.items = [imageItem];
+                    this.saveState();
+                    this.renderCanvas();
+                };
+                img.src = note.imageData;
+            }
+
+            async renameNote(id) {
+                const notes = JSON.parse(localStorage.getItem('whiteboard_notes') || '[]');
+                const note = notes.find(n => n.id === id);
+                if (!note) return;
+                const newTitle = prompt('Rename note', note.title || '');
+                if (!newTitle || !newTitle.trim()) return;
+                const oldFileBaseName = note.fileBaseName;
+                note.title = newTitle.trim();
+                note.fileBaseName = this.getUniqueNoteFileBaseName(note.title, notes, note.id);
+                note.updatedAt = new Date().toISOString();
+                this.saveNotes(notes);
+                await this.syncNoteToFolder(note);
+                if (oldFileBaseName && oldFileBaseName !== note.fileBaseName) {
+                    await this.deleteNoteFilesFromFolder(oldFileBaseName);
+                }
+                this.loadNotes();
+            }
+
+            async togglePinNote(id) {
+                const notes = JSON.parse(localStorage.getItem('whiteboard_notes') || '[]');
+                const note = notes.find(n => n.id === id);
+                if (!note) return;
+                note.pinned = !note.pinned;
+                note.updatedAt = new Date().toISOString();
+                this.saveNotes(notes);
+                await this.syncNoteToFolder(note);
+                this.loadNotes();
+            }
+
+            getSortedNotes() {
+                const notes = JSON.parse(localStorage.getItem('whiteboard_notes') || '[]');
+                return notes.sort((a, b) => {
+                    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+                    return new Date(b.updatedAt || b.createdAt || b.date || 0) - new Date(a.updatedAt || a.createdAt || a.date || 0);
+                });
+            }
+
+            saveNotes(notes) {
+                localStorage.setItem('whiteboard_notes', JSON.stringify(this.getSortedNotesFrom(notes)));
+            }
+
+            getSortedNotesFrom(notes) {
+                return notes.sort((a, b) => {
+                    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+                    return new Date(b.updatedAt || b.createdAt || b.date || 0) - new Date(a.updatedAt || a.createdAt || a.date || 0);
+                });
+            }
+
+            formatDate(value) {
+                if (!value) return 'No date';
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) return String(value);
+                return date.toLocaleString();
+            }
+
+            setDefaultNoteDateTime() {
+                const input = document.getElementById('noteDateTime');
+                if (!input) return;
+                const now = new Date();
+                now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                input.value = now.toISOString().slice(0, 16);
+            }
+
+            async syncAllNotesToFolder() {
+                if (!this.notesFolderHandle) return;
+                const notes = JSON.parse(localStorage.getItem('whiteboard_notes') || '[]');
+                for (const note of notes) {
+                    if (!note.fileBaseName) {
+                        note.fileBaseName = this.getUniqueNoteFileBaseName(note.title || 'Untitled note', notes, note.id);
+                    }
+                    await this.syncNoteToFolder(note);
+                }
+                this.saveNotes(notes);
+            }
+
+            async syncNoteToFolder(note) {
+                if (!this.notesFolderHandle || !note) return;
+                if (!note.fileBaseName) note.fileBaseName = this.slugifyFileName(note.title || 'Untitled note');
+
+                try {
+                    await this.writeTextFile(`${note.fileBaseName}.whiteboard.json`, JSON.stringify(this.noteToFileData(note), null, 2));
+                    if (note.imageData) {
+                        await this.writeBlobFile(`${note.fileBaseName}.png`, this.dataUrlToBlob(note.imageData));
+                    }
+                    document.getElementById('folderSyncStatus').textContent = `Synced to ${this.notesFolderHandle.name}`;
+                } catch (error) {
+                    document.getElementById('folderSyncStatus').textContent = 'Folder sync failed. Choose the notes folder again.';
+                    this.notesFolderHandle = null;
+                }
+            }
+
+            async writeTextFile(fileName, text) {
+                const handle = await this.notesFolderHandle.getFileHandle(fileName, { create: true });
+                const writable = await handle.createWritable();
+                await writable.write(text);
+                await writable.close();
+            }
+
+            async writeBlobFile(fileName, blob) {
+                const handle = await this.notesFolderHandle.getFileHandle(fileName, { create: true });
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+            }
+
+            async deleteNoteFilesFromFolder(fileBaseName) {
+                if (!this.notesFolderHandle || !fileBaseName) return;
+                for (const extension of ['.whiteboard.json', '.png']) {
+                    try {
+                        await this.notesFolderHandle.removeEntry(`${fileBaseName}${extension}`);
+                    } catch (error) {
+                    }
+                }
+            }
+
+            noteToFileData(note) {
+                return {
+                    id: note.id,
+                    title: note.title,
+                    pinned: !!note.pinned,
+                    createdAt: note.createdAt,
+                    updatedAt: note.updatedAt,
+                    noteDate: note.noteDate,
+                    stateData: note.stateData,
+                    imageFile: `${note.fileBaseName}.png`
+                };
+            }
+
+            dataUrlToBlob(dataUrl) {
+                const parts = dataUrl.split(',');
+                const mime = parts[0].match(/:(.*?);/)[1];
+                const binary = atob(parts[1]);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                return new Blob([bytes], { type: mime });
+            }
+
+            getUniqueNoteFileBaseName(title, notes, currentId) {
+                const base = this.slugifyFileName(title || 'Untitled note');
+                let candidate = base;
+                let index = 2;
+                const used = new Set(notes
+                    .filter(note => note.id !== currentId)
+                    .map(note => note.fileBaseName || this.slugifyFileName(note.title || 'Untitled note')));
+                while (used.has(candidate)) {
+                    candidate = `${base}-${index}`;
+                    index++;
+                }
+                return candidate;
+            }
+
+            slugifyFileName(value) {
+                const cleaned = value
+                    .trim()
+                    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .slice(0, 80);
+                return cleaned || 'Untitled note';
+            }
+
+            hydrateImages() {
+                this.items.forEach(item => {
+                    if (item.type !== 'image' || !item.imageData) return;
+                    const img = new Image();
+                    img.onload = () => {
+                        item.imageElement = img;
+                        this.renderCanvas();
+                    };
+                    img.src = item.imageData;
+                });
+            }
+
+            async deleteNote(id) {
+                if (confirm('Are you sure you want to delete this note?')) {
+                    let notes = JSON.parse(localStorage.getItem('whiteboard_notes') || '[]');
+                    const note = notes.find(n => n.id === id);
+                    notes = notes.filter(n => n.id !== id);
+                    localStorage.setItem('whiteboard_notes', JSON.stringify(notes));
+                    if (note && note.fileBaseName) await this.deleteNoteFilesFromFolder(note.fileBaseName);
+                    this.loadNotes();
+                }
+            }
+
+            createId() {
+                return Date.now().toString(36) + Math.random().toString(36).slice(2);
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        }
+
+        const whiteboard = new Whiteboard();
+        document.getElementById('saveNoteBtn').addEventListener('click', () => whiteboard.saveNote());
+        whiteboard.loadNotes();
+
+        const sidebar = document.querySelector('.notes-sidebar');
+        const toggleBtn = document.getElementById('toggleSidebarBtn');
+        toggleBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('hidden');
+            toggleBtn.textContent = sidebar.classList.contains('hidden') ? '📖' : '📋';
+        });
+    </script>
+</body>
+</html>
