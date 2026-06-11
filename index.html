@@ -2027,10 +2027,40 @@ class OptimizedWhiteboard {
         if (!item.points || item.points.length === 0) return;
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'source-over';
-        this.ctx.strokeStyle = this.mode === 'dark' ? 'rgba(238,246,255,.55)' : 'rgba(37,99,150,.45)';
-        this.ctx.lineWidth = item.width; this.ctx.lineCap = 'round'; this.ctx.lineJoin = 'round';
-        this.ctx.setLineDash([2,8]);
-        this.drawSmoothPath(this.ctx, item.points);
+        
+        // Enhanced visual feedback for stroke eraser
+        if (this.eraserMode === 'stroke') {
+            // Show translucent red preview for stroke eraser
+            this.ctx.strokeStyle = 'rgba(255, 50, 50, 0.4)';
+            this.ctx.fillStyle = 'rgba(255, 50, 50, 0.15)';
+            this.ctx.lineWidth = item.width;
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+            this.ctx.setLineDash([4, 6]);
+            
+            // Draw the path
+            if (item.points.length === 1) {
+                this.ctx.beginPath();
+                this.ctx.arc(item.points[0].x, item.points[0].y, item.width/2, 0, Math.PI*2);
+                this.ctx.fill();
+            } else {
+                this.drawSmoothPath(this.ctx, item.points);
+                // Also fill the area for better visibility
+                this.ctx.setLineDash([]);
+                this.ctx.globalCompositeOperation = 'source-over';
+                this.ctx.fillStyle = 'rgba(255, 50, 50, 0.08)';
+                this.drawSmoothPath(this.ctx, item.points);
+            }
+        } else {
+            // Area eraser preview (original)
+            this.ctx.strokeStyle = this.mode === 'dark' ? 'rgba(238,246,255,.55)' : 'rgba(37,99,150,.45)';
+            this.ctx.lineWidth = item.width;
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+            this.ctx.setLineDash([2, 8]);
+            this.drawSmoothPath(this.ctx, item.points);
+        }
+        
         this.ctx.restore();
     }
 
@@ -2291,7 +2321,14 @@ class OptimizedWhiteboard {
             if (nearBottom) this.extendCanvas();
         }, { passive: true });
 
-        document.addEventListener('keydown', e => this.handleKeyboard(e));
+        document.addEventListener('keydown', e => {
+            // Verify the whiteboard instance is available
+            if (typeof this.undo === 'function') {
+                this.handleKeyboard(e);
+            } else {
+                console.warn('Whiteboard methods not yet initialized');
+            }
+        });
         window.addEventListener('beforeunload', () => this.saveCurrentNote());
         window.addEventListener('resize', () => { this.invalidateRect(); this.resizeCanvas(); });
         this.updateActiveStates();
@@ -2364,18 +2401,103 @@ class OptimizedWhiteboard {
         const activeTag = document.activeElement ? document.activeElement.tagName : '';
         if (['INPUT','TEXTAREA','SELECT'].includes(activeTag)) return;
         const mod = e.ctrlKey || e.metaKey;
-        if (mod && e.key === 's')            { e.preventDefault(); this.manualSave(); }
-        else if (mod && e.key === '0')       { e.preventDefault(); this.setZoom(1); }
-        else if (mod && (e.key==='='||e.key==='+')) { e.preventDefault(); this.setZoom(this.zoom+0.1); }
-        else if (mod && e.key==='-')         { e.preventDefault(); this.setZoom(this.zoom-0.1); }
-        else if (mod && e.shiftKey && e.key.toLowerCase()==='z') { e.preventDefault(); this.redo(); }
-        else if (mod && e.key.toLowerCase()==='z') { e.preventDefault(); this.undo(); }
-        else if (mod && e.key.toLowerCase()==='y') { e.preventDefault(); this.redo(); }
-        else if (mod && e.key.toLowerCase()==='c') { e.preventDefault(); this.copySelection(); }
-        else if (mod && e.key.toLowerCase()==='x') { e.preventDefault(); this.cutSelection(); }
-        else if (mod && e.key.toLowerCase()==='v') { e.preventDefault(); this.pasteSelection(); }
-        else if ((e.key==='Delete'||e.key==='Backspace') && this.selectedIds.size>0) { e.preventDefault(); this.deleteSelection(); }
-        else if (e.key==='Escape') this.closeAllMenus();
+        
+        // Debug logging to console (remove after testing)
+        console.log('Key pressed:', e.key, 'Ctrl:', mod, 'Shift:', e.shiftKey);
+        
+        // Undo/Redo with visual feedback
+        // Support both e.key and e.code for better cross-browser compatibility
+        const key = e.key.toLowerCase();
+        if (mod && (key === 'z' || key === 'у') && !e.shiftKey) { // 'у' for Russian keyboard layout
+            e.preventDefault();
+            e.stopPropagation();
+            this.undo();
+            this.showShortcutFeedback('Undo (Ctrl+Z)');
+        }
+        else if ((mod && (key === 'y' || key === 'н')) || (mod && e.shiftKey && (key === 'z' || key === 'у'))) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.redo();
+            this.showShortcutFeedback('Redo (Ctrl+Y)');
+        }
+        else if (mod && e.key === 's') {
+            e.preventDefault();
+            this.manualSave();
+            this.showShortcutFeedback('Saved');
+        }
+        else if (mod && e.key === '0') {
+            e.preventDefault();
+            this.setZoom(1);
+            this.showShortcutFeedback('Zoom 100%');
+        }
+        else if (mod && (e.key==='='||e.key==='+')) {
+            e.preventDefault();
+            this.setZoom(this.zoom+0.1);
+            this.showShortcutFeedback(`Zoom ${Math.round(this.zoom*100)}%`);
+        }
+        else if (mod && e.key==='-') {
+            e.preventDefault();
+            this.setZoom(this.zoom-0.1);
+            this.showShortcutFeedback(`Zoom ${Math.round(this.zoom*100)}%`);
+        }
+        else if (mod && e.key.toLowerCase()==='c') {
+            e.preventDefault();
+            this.copySelection();
+            this.showShortcutFeedback('Copied');
+        }
+        else if (mod && e.key.toLowerCase()==='x') {
+            e.preventDefault();
+            this.cutSelection();
+            this.showShortcutFeedback('Cut');
+        }
+        else if (mod && e.key.toLowerCase()==='v') {
+            e.preventDefault();
+            this.pasteSelection();
+            this.showShortcutFeedback('Pasted');
+        }
+        else if ((e.key==='Delete'||e.key==='Backspace') && this.selectedIds.size>0) {
+            e.preventDefault();
+            this.deleteSelection();
+            this.showShortcutFeedback('Deleted');
+        }
+        else if (e.key==='Escape') {
+            this.closeAllMenus();
+            this.showShortcutFeedback('Menu closed');
+        }
+    }
+    
+    showShortcutFeedback(message) {
+        // Show temporary feedback for keyboard shortcuts
+        let feedback = document.getElementById('shortcutFeedback');
+        if (!feedback) {
+            feedback = document.createElement('div');
+            feedback.id = 'shortcutFeedback';
+            feedback.style.cssText = `
+                position: fixed;
+                bottom: 70px;
+                right: 20px;
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                z-index: 10000;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.2s ease;
+                backdrop-filter: blur(8px);
+                font-family: system-ui, -apple-system, sans-serif;
+            `;
+            document.body.appendChild(feedback);
+        }
+        
+        feedback.textContent = message;
+        feedback.style.opacity = '1';
+        clearTimeout(this._feedbackShortcutTimeout);
+        this._feedbackShortcutTimeout = setTimeout(() => {
+            feedback.style.opacity = '0';
+        }, 1200);
     }
 
     /* ── TOOLS ── */
@@ -2533,7 +2655,28 @@ class OptimizedWhiteboard {
         if (!this.currentStroke.hasPressure && pos.p !== undefined && pos.p !== 1) {
             this.currentStroke.hasPressure = true;
         }
-        if (this.currentTool === 'eraser' && this.eraserMode === 'stroke') { this.eraseIntersectingStrokesOptimized(last, pos); return true; }
+        if (this.currentTool === 'eraser' && this.eraserMode === 'stroke') {
+            // Interpolate between last and current point for smoother erasing
+            const dx = pos.x - last.x;
+            const dy = pos.y - last.y;
+            const distance = Math.hypot(dx, dy);
+            const stepSize = this.eraserSize * 0.5; // Sample every half eraser size
+            
+            if (distance > stepSize) {
+                const steps = Math.ceil(distance / stepSize);
+                for (let step = 1; step <= steps; step++) {
+                    const t = step / steps;
+                    const interpX = last.x + dx * t;
+                    const interpY = last.y + dy * t;
+                    this.eraseIntersectingStrokesOptimized(
+                        { x: interpX, y: interpY },
+                        { x: interpX, y: interpY }
+                    );
+                }
+            }
+            this.eraseIntersectingStrokesOptimized(last, pos);
+            return true;
+        }
         
         // Zero-latency incremental rendering directly to the canvas!
         this.drawIncrementalTail(this.ctx, this.currentStroke);
@@ -2548,12 +2691,20 @@ class OptimizedWhiteboard {
         if (this.currentTool === 'lasso') { this.selectWithLasso(); this.currentLasso=null; this.scheduleRender(); this.updateActiveStates(); return; }
         if (this.currentTool === 'eraser' && this.eraserMode === 'stroke') {
             this.currentStroke = null;
-            if (this.erasedDuringStroke) {
+            if (this.erasedDuringStroke && this._pendingRemovals && this._pendingRemovals.size > 0) {
+                // DELETE ALL MARKED STROKES AT ONCE (CRITICAL FIX)
+                this.items = this.items.filter(item => !this._pendingRemovals.has(item));
+                this.selectedIds.clear();
                 this.saveState();
                 this.rebuildSpatialIndex();
                 this.cachedOffscreenValid = false;
+                this.scheduleRender();
+                this.erasedDuringStroke = false;
+                
+                // Clear pending removals
+                this._pendingRemovals.clear();
             }
-            this.scheduleRender(); return;
+            return;
         }
         if (this.currentStroke) {
             // Draw the completed stroke directly onto offscreen canvas BEFORE pushing to items
@@ -2563,11 +2714,17 @@ class OptimizedWhiteboard {
             this.items.push(this.currentStroke);
             this.addStrokeToSpatialIndex(this.currentStroke, this.items.length-1);
             this.currentStroke = null;
-            // saveState() and autosave are NOT called here — they happen in the
-            // 15-min autosave or when the user manually clicks Save.
+            
+            // Mark that we have a new stroke for history
+            this._pendingStroke = true;
+            
+            // Save state for undo/redo
+            this.saveState();
+            
+            // Clear pending flag after save
+            this._pendingStroke = false;
+            
             this.dirty = true;
-            // IMPORTANT: Keep cache valid by NOT invalidating it
-            // this.cachedOffscreenValid remains true since we added the stroke to offscreen
             this.scheduleRender();
         }
     }
@@ -2640,25 +2797,134 @@ class OptimizedWhiteboard {
              .replace(/'/g, "&#039;");
     }
 
-    /* ── ERASE ── */
+/* ── ERASE OPTIMIZED - CAPSULE INTERSECTION ── */
     eraseIntersectingStrokesOptimized(a, b) {
-        const radius = this.eraserSize/2;
-        const cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
-        const nearby = this.getStrokesNearPoint(cx, cy, radius);
-        const before = this.items.length;
-        this.items = this.items.filter(item => {
-            if (item.type!=='stroke') return true;
-            if (!nearby.includes(item)) return true;
-            return !this.strokeIntersectsSegment(item, a, b, radius+item.width/2);
-        });
-        if (this.items.length !== before) { 
-            this.erasedDuringStroke=true; 
-            this.selectedIds.clear(); 
-            this.updateActiveStates(); 
-            this.cachedOffscreenValid=false; 
-            this.dirty = true;
-            this.updateSaveState('editing');
+        const radius = this.eraserSize * 0.75; // Increased by 50% for better feel
+        
+        // Use spatial index to get candidate strokes
+        const cx = (a.x + b.x) / 2;
+        const cy = (a.y + b.y) / 2;
+        const candidates = this.getStrokesNearPoint(cx, cy, radius * 2);
+        
+        if (candidates.length === 0) return;
+        
+        // Pre-calculate capsule bounds
+        const capsuleMinX = Math.min(a.x, b.x) - radius;
+        const capsuleMaxX = Math.max(a.x, b.x) + radius;
+        const capsuleMinY = Math.min(a.y, b.y) - radius;
+        const capsuleMaxY = Math.max(a.y, b.y) + radius;
+        
+        // Track strokes to remove in this batch
+        if (!this._pendingRemovals) this._pendingRemovals = new Set();
+        
+        for (const stroke of candidates) {
+            // Skip if already marked for removal
+            if (this._pendingRemovals.has(stroke)) continue;
+            
+            // Fast bounding box rejection
+            const bounds = stroke._bounds || this.getStrokeBounds(stroke);
+            if (bounds.maxX < capsuleMinX || bounds.minX > capsuleMaxX ||
+                bounds.maxY < capsuleMinY || bounds.minY > capsuleMaxY) {
+                continue;
+            }
+            
+            // Capsule intersection test (point to segment distance)
+            if (this.capsuleIntersectsStroke(stroke, a, b, radius)) {
+                this._pendingRemovals.add(stroke);
+            }
         }
+        
+        // ONLY MARK - NO DELETION DURING ERASING
+        if (this._pendingRemovals.size > 0) {
+            this.erasedDuringStroke = true;
+        }
+    }
+    
+    capsuleIntersectsStroke(stroke, a, b, radius) {
+        const points = stroke.points;
+        const tol = radius + stroke.width/2;
+        
+        // Check distance from any point in stroke to the eraser segment
+        for (const point of points) {
+            const dist = this.distancePointToSegment(point, a, b);
+            if (dist <= tol) return true;
+        }
+        
+        return false;
+    }
+    
+    fastStrokeIntersects(stroke, a, b, radius) {
+        const points = stroke.points;
+        const tol = radius + stroke.width/2;
+        
+        // Check if any point in the stroke is close to the eraser segment
+        for (let i = 0; i < points.length; i++) {
+            const p = points[i];
+            // Calculate distance from point to line segment (a, b)
+            const dist = this.distancePointToSegment(p, a, b);
+            if (dist <= tol) return true;
+        }
+        
+        // Also check if any segment of the stroke intersects the eraser
+        for (let i = 1; i < points.length; i++) {
+            if (this.segmentsNearFast(points[i-1], points[i], a, b, tol)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    segmentsNearFast(p1, p2, p3, p4, tol) {
+        // Check if segments are close using distance checks
+        return this.distancePointToSegment(p1, p3, p4) <= tol ||
+               this.distancePointToSegment(p2, p3, p4) <= tol ||
+               this.distancePointToSegment(p3, p1, p2) <= tol ||
+               this.distancePointToSegment(p4, p1, p2) <= tol;
+    }
+    
+    strokeIntersectsSegmentFast(stroke, a, b, tol) {
+        // Optimized version with early exits
+        if (stroke.points.length === 1) {
+            return this.distancePointToSegment(stroke.points[0], a, b) <= tol;
+        }
+        
+        // Check segment intersections with early exit
+        for (let i = 1; i < stroke.points.length; i++) {
+            if (this.segmentsNearFast(stroke.points[i-1], stroke.points[i], a, b, tol)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    segmentsNearFast(a, b, c, d, tol) {
+        // Fast bounding box check for segments
+        const segBbox = {
+            minX: Math.min(a.x, b.x) - tol,
+            maxX: Math.max(a.x, b.x) + tol,
+            minY: Math.min(a.y, b.y) - tol,
+            maxY: Math.max(a.y, b.y) + tol
+        };
+        const eraserBbox = {
+            minX: Math.min(c.x, d.x) - tol,
+            maxX: Math.max(c.x, d.x) + tol,
+            minY: Math.min(c.y, d.y) - tol,
+            maxY: Math.max(c.y, d.y) + tol
+        };
+        
+        // Quick rejection if bounding boxes don't overlap
+        if (segBbox.maxX < eraserBbox.minX || segBbox.minX > eraserBbox.maxX ||
+            segBbox.maxY < eraserBbox.minY || segBbox.minY > eraserBbox.maxY) {
+            return false;
+        }
+        
+        // Only do detailed distance check if bounding boxes overlap
+        return this.distancePointToSegment(a, c, d) <= tol || 
+               this.distancePointToSegment(b, c, d) <= tol ||
+               this.distancePointToSegment(c, a, b) <= tol || 
+               this.distancePointToSegment(d, a, b) <= tol ||
+               this.segmentsCross(a, b, c, d);
     }
 
     strokeIntersectsSegment(stroke, a, b, tol) {
@@ -2743,23 +3009,76 @@ class OptimizedWhiteboard {
         return stroke._bounds;
     }
 
-    /* ── HISTORY ── */
+    /* ── HISTORY (OPTIMIZED) ── */
     saveState() {
-        this.history = this.history.slice(0, this.historyIndex+1);
-        this.history.push(JSON.stringify(this.items.map(i=>this.serializeItem(i))));
-        this.historyIndex = this.history.length-1;
+        // Store only the last stroke as a delta for performance
+        if (this._pendingStroke && this.items.length > 0) {
+            const lastStrokeIndex = this.items.length - 1;
+            const lastStroke = this.serializeItem(this.items[lastStrokeIndex]);
+            
+            this.history = this.history.slice(0, this.historyIndex+1);
+            this.history.push({
+                type: 'stroke',
+                index: lastStrokeIndex,
+                stroke: lastStroke,
+                prevLength: this.items.length - 1
+            });
+            this.historyIndex = this.history.length-1;
+            this._pendingStroke = false;
+        }
+        
         this.dirty = true;
-        if (this.history.length > 100) { this.history.shift(); this.historyIndex--; }
+        if (this.history.length > 50) { 
+            this.history.shift(); 
+            this.historyIndex--; 
+        }
     }
 
     restoreState() {
-        this.items = JSON.parse(this.history[this.historyIndex]||'[]');
-        this.selectedIds.clear(); this.hydrateImages(); this.rebuildSpatialIndex(); this.cachedOffscreenValid=false; this.scheduleRender(); this.updateActiveStates();
+        if (this.historyIndex < 0 || this.historyIndex >= this.history.length) return;
+        
+        const entry = this.history[this.historyIndex];
+        
+        // Incremental restore based on delta
+        if (entry.type === 'stroke') {
+            if (this.items.length > entry.prevLength) {
+                // Undo: remove the last stroke
+                this.items.pop();
+            } else if (this.items.length === entry.prevLength) {
+                // Redo: add the stroke back
+                this.items.push(this.deserializeItem(entry.stroke));
+            }
+        }
+        
+        this.selectedIds.clear();
+        this.rebuildSpatialIndex();
+        this.cachedOffscreenValid = false;
+        this.scheduleRender();
+        this.updateActiveStates();
         this.queueSave();
     }
-
-    undo() { if (this.historyIndex>0) { this.historyIndex--; this.restoreState(); } }
-    redo() { if (this.historyIndex<this.history.length-1) { this.historyIndex++; this.restoreState(); } }
+    
+    undo() { 
+        if (this.historyIndex > 0) { 
+            this.historyIndex--; 
+            // Add visual feedback without full re-render delay
+            this.showShortcutFeedback('↩️ Undo');
+            // Direct restore for speed
+            this.restoreState();
+        } else {
+            this.showShortcutFeedback('Nothing to undo');
+        }
+    }
+    
+    redo() { 
+        if (this.historyIndex < this.history.length - 1) { 
+            this.historyIndex++; 
+            this.showShortcutFeedback('↪️ Redo');
+            this.restoreState();
+        } else {
+            this.showShortcutFeedback('Nothing to redo');
+        }
+    }
 
     clear() { this.items=[]; this.selectedIds.clear(); this.saveState(); this.rebuildSpatialIndex(); this.cachedOffscreenValid=false; this.scheduleRender(); this.updateActiveStates(); this.queueSave(); }
 
@@ -2850,6 +3169,16 @@ class OptimizedWhiteboard {
     }
 
     serializeItem(item) { const c={...item}; delete c.imageElement; return c; }
+    
+    deserializeItem(data) { 
+        const item = {...data}; 
+        // Restore any necessary properties
+        if (item.type === 'image' && item.imageUrl) {
+            item.imageElement = new Image();
+            item.imageElement.src = item.imageUrl;
+        }
+        return item; 
+    }
 
     /* ── FAVORITE PENS ── */
     loadFavoritePens() {
