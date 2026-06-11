@@ -2770,8 +2770,14 @@ class OptimizedWhiteboard {
     getPos(e) {
         const canvasRect = this._getCanvasRect();
         const pt = e.touches ? e.touches[0] : e;
-        let x = (pt.clientX - canvasRect.left) / this.zoom;
-        let y = (pt.clientY - canvasRect.top)  / this.zoom;
+        
+        // Account for scroll offset in the container
+        const scrollX = this.container.scrollLeft;
+        const scrollY = this.container.scrollTop;
+        
+        let x = (pt.clientX - canvasRect.left + scrollX) / this.zoom;
+        let y = (pt.clientY - canvasRect.top + scrollY) / this.zoom;
+        
         x = Math.max(0, Math.min(x, this.canvas.width));
         y = Math.max(0, Math.min(y, this.canvas.height));
         
